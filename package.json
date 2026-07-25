@@ -1,0 +1,16 @@
+{
+  "name": "murder-mystery-app",
+  "version": "1.0.0",
+  "description": "Адмін-панель для детективної рольової гри — роздача карток гравцям через телефон",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cookie-parser": "^1.4.6"
+  }
+}

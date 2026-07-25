@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Адмін-панель ведучого — Сутінковий сад</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="container login-box" id="login-view">
+  <h1>🕵️ Панель ведучого</h1>
+  <p class="subtitle">Введи пароль доступу</p>
+  <div class="card-panel">
+    <label for="pw-input">Пароль</label>
+    <input type="password" id="pw-input" autocomplete="off" />
+    <div class="error" id="login-error"></div>
+    <button id="login-btn">Увійти</button>
+  </div>
+</div>
+
+<div class="container wide" id="admin-view" style="display:none;">
+  <h1>🕵️ Сутінковий сад — Панель ведучого</h1>
+  <p class="subtitle">Керуй грою та стеж за картками гравців</p>
+
+  <div class="admin-header">
+    <div class="admin-status" id="status-line">Завантаження...</div>
+    <button class="secondary" style="width:auto;" id="reset-btn">Скинути гру</button>
+  </div>
+
+  <div class="card-panel admin-controls">
+    <div>
+      <label for="count-input">Кількість гравців (3–10)</label>
+      <input type="number" id="count-input" min="3" max="10" value="6" />
+    </div>
+    <button id="start-btn">Почати нову гру</button>
+  </div>
+  <div class="error" id="admin-error"></div>
+
+  <h2 style="color: var(--gold); margin-top: 30px;">Гравці та їхні картки</h2>
+  <div class="players-grid" id="players-grid"></div>
+</div>
+
+<script>
+const loginView = document.getElementById('login-view');
+const adminView = document.getElementById('admin-view');
+const pwInput = document.getElementById('pw-input');
+const loginBtn = document.getElementById('login-btn');
+const loginError = document.getElementById('login-error');
+const statusLine = document.getElementById('status-line');
+const countInput = document.getElementById('count-input');
+const startBtn = document.getElementById('start-btn');
+const resetBtn = document.getElementById('reset-btn');
+const adminError = document.getElementById('admin-error');
+const playersGrid = document.getElementById('players-grid');
+
+let password = sessionStorage.getItem('adminPassword') || '';
+let pollTimer = null;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Admin-Password': password,
+      ...(opts.headers || {})
+    }
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Помилка запиту');
+  return data;
+}
+
+async function tryLogin() {
+  loginError.textContent = '';
+  password = pwInput.value;
+  try {
+    await api('/api/admin/status', { method: 'POST' });
+    sessionStorage.setItem('adminPassword', password);
+    loginView.style.display = 'none';
+    adminView.style.display = 'block';
+    startPolling();
+  } catch (e) {
+    loginError.textContent = 'Невірний пароль';
+  }
+}
+
+loginBtn.addEventListener('click', tryLogin);
+pwInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') tryLogin();
+});
+
+startBtn.addEventListener('click', async () => {
+  adminError.textContent = '';
+  const count = parseInt(countInput.value, 10);
+  try {
+    await api('/api/admin/start-game', {
+      method: 'POST',
+      body: JSON.stringify({ count })
+    });
+    refresh();
+  } catch (e) {
+    adminError.textContent = e.message;
+  }
+});
+
+resetBtn.addEventListener('click', async () => {
+  if (!confirm('Скинути поточну гру? Всі роздані картки буде втрачено.')) return;
+  try {
+    await api('/api/admin/reset', { method: 'POST' });
+    refresh();
+  } catch (e) {
+    adminError.textContent = e.message;
+  }
+});
+
+function renderPlayers(data) {
+  const total = data.totalSlots || 0;
+  const taken = data.players.length;
+  statusLine.textContent = data.status === 'active'
+    ? `Гра триває · зайнято ${taken} з ${total} ролей`
+    : 'Гру ще не розпочато';
+
+  playersGrid.innerHTML = '';
+  data.players.forEach((p) => {
+    const tile = document.createElement('div');
+    tile.className = 'player-tile';
+    const tag = p.role.isKiller
+      ? '<span class="killer-tag">ВБИВЦЯ</span>'
+      : '<span class="innocent-tag">не вбивця</span>';
+    tile.innerHTML = `
+      <div class="p-name">${p.name}</div>
+      <div style="font-size:0.85rem;color:var(--muted);margin-bottom:6px;">${p.role.character}</div>
+      <div style="font-size:0.85rem;margin-bottom:6px;"><b>Секрет:</b> ${p.role.secret}</div>
+      <div style="font-size:0.85rem;margin-bottom:8px;"><b>Стосунки з жертвою:</b> ${p.role.relationToVictim}</div>
+      ${tag}
+    `;
+    playersGrid.appendChild(tile);
+  });
+
+  const remaining = data.remaining || 0;
+  for (let i = 0; i < remaining; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-slot';
+    empty.textContent = 'Очікуємо гравця...';
+    playersGrid.appendChild(empty);
+  }
+}
+
+async function refresh() {
+  try {
+    const data = await api('/api/admin/players');
+    renderPlayers(data);
+  } catch (e) {
+    adminError.textContent = e.message;
+  }
+}
+
+function startPolling() {
+  refresh();
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(refresh, 3000);
+}
+
+// Автовхід, якщо пароль вже збережено в цій сесії браузера
+if (password) {
+  tryLogin().then(() => { pwInput.value = password; });
+}
+</script>
+</body>
+</html>

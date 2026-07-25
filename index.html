@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Вечірка на віллі "Сутінковий сад" — твоя роль</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="container">
+  <h1>🔪 Сутінковий сад</h1>
+  <p class="subtitle">Артур Ковальський мертвий. Один із вас — вбивця.</p>
+
+  <div id="join-panel" class="card-panel">
+    <label for="name-input">Твоє ім'я</label>
+    <input type="text" id="name-input" placeholder="Введи ім'я гравця" autocomplete="off" />
+    <div class="error" id="join-error"></div>
+    <button id="join-btn">Отримати роль</button>
+  </div>
+
+  <div id="card-panel" style="display:none;"></div>
+</div>
+
+<script>
+const joinPanel = document.getElementById('join-panel');
+const cardPanel = document.getElementById('card-panel');
+const joinBtn = document.getElementById('join-btn');
+const nameInput = document.getElementById('name-input');
+const joinError = document.getElementById('join-error');
+
+function renderCard(data) {
+  const role = data.role;
+  const victim = data.victim;
+  const tag = role.isKiller
+    ? '<span class="killer-tag">ТИ — ВБИВЦЯ</span>'
+    : '<span class="innocent-tag">Ти не вбивця</span>';
+
+  cardPanel.innerHTML = `
+    <div class="role-card">
+      <div class="player-name">Гравець: ${data.name}</div>
+      <h2>${role.character}</h2>
+      <div class="field">
+        <div class="field-label">Опис персонажа</div>
+        <div class="field-value">${role.description}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Стосунки з жертвою</div>
+        <div class="field-value">${role.relationToVictim}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Твій секрет</div>
+        <div class="field-value">${role.secret}</div>
+      </div>
+      ${tag}
+      <div class="victim-box">
+        <strong>Жертва: ${victim.name}</strong><br/>
+        ${victim.description}
+      </div>
+    </div>
+  `;
+  joinPanel.style.display = 'none';
+  cardPanel.style.display = 'block';
+}
+
+async function checkExisting() {
+  try {
+    const res = await fetch('/api/my-card');
+    const data = await res.json();
+    if (data.joined) {
+      renderCard(data);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+joinBtn.addEventListener('click', async () => {
+  const name = nameInput.value.trim();
+  joinError.textContent = '';
+  if (!name) {
+    joinError.textContent = 'Будь ласка, введи ім’я';
+    return;
+  }
+  joinBtn.disabled = true;
+  joinBtn.textContent = 'Отримуємо роль...';
+  try {
+    const res = await fetch('/api/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      joinError.textContent = data.error || 'Помилка';
+      joinBtn.disabled = false;
+      joinBtn.textContent = 'Отримати роль';
+      return;
+    }
+    renderCard(data);
+  } catch (e) {
+    joinError.textContent = 'Помилка з’єднання. Спробуй ще раз.';
+    joinBtn.disabled = false;
+    joinBtn.textContent = 'Отримати роль';
+  }
+});
+
+checkExisting();
+</script>
+</body>
+</html>
