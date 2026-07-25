@@ -131,6 +131,7 @@ function renderPlayers(data) {
     tile.innerHTML = `
       <div class="p-name">${p.name}</div>
       <div style="font-size:0.85rem;color:var(--muted);margin-bottom:6px;">${p.role.character}</div>
+      <div style="font-size:0.85rem;margin-bottom:6px;"><b>Опис персонажа:</b> ${p.role.description}</div>
       <div style="font-size:0.85rem;margin-bottom:6px;"><b>Секрет:</b> ${p.role.secret}</div>
       <div style="font-size:0.85rem;margin-bottom:8px;"><b>Стосунки з жертвою:</b> ${p.role.relationToVictim}</div>
       ${tag}
