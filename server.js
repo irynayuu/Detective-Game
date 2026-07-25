@@ -1,8 +1,7 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
-const path = require('path');
-const { VICTIM, getRolesForCount } = require('./data/scenario');
+const { VICTIM, getRolesForCount } = require('./scenario');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,13 +9,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'detective2026';
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(__dirname));
 
-// ---- Стан гри в пам'яті ----
-// game.status: 'idle' | 'active'
-// game.roles: масив ролей, доступних у поточній грі (обраний зсув з ORDER)
-// game.availableRoleIds: ролі, які ще нікому не видані
-// game.players: Map(playerId -> { id, name, roleId, joinedAt })
 let game = {
   status: 'idle',
   totalSlots: 0,
@@ -46,7 +40,6 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// ---- Admin: старт гри ----
 app.post('/api/admin/start-game', requireAdmin, (req, res) => {
   const count = parseInt(req.body.count, 10);
   if (!Number.isInteger(count) || count < 3 || count > 10) {
@@ -63,7 +56,6 @@ app.post('/api/admin/start-game', requireAdmin, (req, res) => {
   res.json({ ok: true, totalSlots: count });
 });
 
-// ---- Admin: скинути гру ----
 app.post('/api/admin/reset', requireAdmin, (req, res) => {
   game = {
     status: 'idle',
@@ -75,7 +67,6 @@ app.post('/api/admin/reset', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- Admin: перевірка пароля / статус ----
 app.post('/api/admin/status', requireAdmin, (req, res) => {
   res.json({
     status: game.status,
@@ -85,7 +76,6 @@ app.post('/api/admin/status', requireAdmin, (req, res) => {
   });
 });
 
-// ---- Admin: список гравців з картками ----
 app.get('/api/admin/players', requireAdmin, (req, res) => {
   const players = Array.from(game.players.values()).map((p) => {
     const role = game.roles.find((r) => r.id === p.roleId);
@@ -104,7 +94,6 @@ app.get('/api/admin/players', requireAdmin, (req, res) => {
   });
 });
 
-// ---- Player: приєднатися й отримати роль ----
 app.post('/api/join', (req, res) => {
   if (game.status !== 'active') {
     return res.status(400).json({ error: 'Гру ще не розпочато. Зачекайте на ведучу.' });
@@ -115,7 +104,6 @@ app.post('/api/join', (req, res) => {
     return res.status(400).json({ error: 'Введіть ім’я' });
   }
 
-  // Якщо у гравця вже є cookie з активною роллю в цій грі — повертаємо її ж
   const existingId = req.cookies.playerId;
   if (existingId && game.players.has(existingId)) {
     const p = game.players.get(existingId);
@@ -141,7 +129,6 @@ app.post('/api/join', (req, res) => {
   res.json({ name, role, victim: VICTIM });
 });
 
-// ---- Player: отримати свою картку, якщо вже приєднався ----
 app.get('/api/my-card', (req, res) => {
   const existingId = req.cookies.playerId;
   if (!existingId || !game.players.has(existingId)) {
